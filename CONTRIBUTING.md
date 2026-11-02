@@ -31,7 +31,7 @@ The git tag is the version. Follow [semver](https://semver.org): patch for fixes
 git tag v0.2.0 && git push origin v0.2.0
 ```
 
-`.github/workflows/release.yml` then builds the universal app with that version, publishes the GitHub release with `CaffeineWatch.zip`, and bumps `Casks/caffeine-watch.rb` in [omarhoumz/homebrew-tap](https://github.com/omarhoumz/homebrew-tap). The cask bump needs a `TAP_TOKEN` secret (a fine-grained token with Contents read/write on the tap); without it the workflow warns and prints the sha256 to set by hand.
+`.github/workflows/release.yml` then builds the universal app with that version, publishes the GitHub release with `CaffeineWatch.zip`, and bumps `Casks/caffeine-watch.rb` in [omarhoumz/homebrew-tap](https://github.com/omarhoumz/homebrew-tap). The cask bump needs a `HOMEBREW_TAP_TOKEN` secret (a fine-grained token with Contents read/write on the tap); without it the workflow warns and prints the sha256 to set by hand.
 
 ## Ideas welcome
 
