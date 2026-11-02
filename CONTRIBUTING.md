@@ -11,7 +11,7 @@ Open an issue with:
 - the raw output of `pmset -g assertions` (remove anything you'd rather not share)
 - what you expected to see instead
 
-Most bugs come from a `pmset` line format the parser hasn't seen, so the raw output matters most.
+The raw `pmset` output shows the same assertions the app reads, so it matters most.
 
 ## Making a change
 
@@ -25,13 +25,15 @@ If you change the icon, update both `Sources/CaffeineWatch/Icon.swift` and `scri
 
 ## Releasing (maintainer)
 
-1. Bump `CFBundleShortVersionString` in `build.sh`, commit, tag `vX.Y.Z`, push.
-2. `./build.sh && ditto -c -k --keepParent build/CaffeineWatch.app build/CaffeineWatch.zip`
-3. `gh release create vX.Y.Z build/CaffeineWatch.zip`
-4. In [omarhoumz/homebrew-tap](https://github.com/omarhoumz/homebrew-tap), update `version` and `sha256` in `Casks/caffeine-watch.rb`.
+The git tag is the version. Follow [semver](https://semver.org): patch for fixes, minor for new features, major for breaking CLI changes.
+
+```sh
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+`.github/workflows/release.yml` then builds the universal app with that version, publishes the GitHub release with `CaffeineWatch.zip`, and bumps `Casks/caffeine-watch.rb` in [omarhoumz/homebrew-tap](https://github.com/omarhoumz/homebrew-tap). The cask bump needs a `TAP_TOKEN` secret (a fine-grained token with Contents read/write on the tap); without it the workflow warns and prints the sha256 to set by hand.
 
 ## Ideas welcome
 
 - signed and notarized release builds
-- start a `caffeinate` from the menu
 - notify when `caffeinate` stops

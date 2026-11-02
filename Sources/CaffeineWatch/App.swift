@@ -19,6 +19,11 @@ final class Model: ObservableObject {
         }
     }
 
+    func keepAwake(seconds: Int?, display: Bool) {
+        KeepAwake.start(seconds: seconds, display: display)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self.refresh() }
+    }
+
     func kill(_ h: Holder) {
         NSApp.activate(ignoringOtherApps: true)
         let alert = NSAlert()
@@ -27,7 +32,7 @@ final class Model: ObservableObject {
         alert.addButton(withTitle: "Kill")
         alert.addButton(withTitle: "Cancel")
         guard alert.runModal() == .alertFirstButtonReturn else { return }
-        Darwin.kill(h.pid, SIGTERM)
+        _ = KeepAwake.stop([h.pid])
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self.refresh() }
     }
 }
@@ -43,7 +48,8 @@ struct HolderView: View {
                 Spacer()
                 if let onKill { Button("Kill", action: onKill).controlSize(.small) }
             }
-            Text(verbatim: "pid \(holder.pid) · \(holder.parent) · up \(holder.running)")
+            Text(verbatim: "pid \(holder.pid) · \(holder.parent) · up \(holder.running)"
+                + (holder.endsIn.map { " · ends in \($0)" } ?? ""))
                 .font(.caption).foregroundStyle(.secondary)
             Text("prevents: " + holder.holds.joined(separator: ", "))
                 .font(.caption).foregroundStyle(.secondary)
@@ -54,6 +60,7 @@ struct HolderView: View {
 struct MenuContent: View {
     @ObservedObject var model: Model
     @State private var showOthers = false
+    @AppStorage("keepDisplayOn") private var keepDisplayOn = true
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
@@ -91,6 +98,16 @@ struct MenuContent: View {
             }
 
             Divider()
+            HStack {
+                Menu("Keep awake") {
+                    Button("1 hour") { model.keepAwake(seconds: 3600, display: keepDisplayOn) }
+                    Button("4 hours") { model.keepAwake(seconds: 4 * 3600, display: keepDisplayOn) }
+                    Button("Until stopped") { model.keepAwake(seconds: nil, display: keepDisplayOn) }
+                }
+                .fixedSize()
+                Toggle("Keep display on", isOn: $keepDisplayOn)
+                Spacer()
+            }
             HStack {
                 Button("Turn display off now") { _ = Shell.run("/usr/bin/pmset", ["displaysleepnow"]) }
                 Spacer()

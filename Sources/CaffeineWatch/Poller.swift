@@ -8,6 +8,7 @@ struct Holder: Identifiable, Hashable {
     let parent: String
     let running: String
     let holds: [String]
+    let endsIn: String?
 
     var isCaffeinate: Bool { processName == "caffeinate" }
 }
@@ -46,8 +47,7 @@ enum Poller {
     private static let tmuxPaths = ["/opt/homebrew/bin/tmux", "/usr/local/bin/tmux", "/usr/bin/tmux"]
 
     static func snapshot() -> Snapshot {
-        let assertions = AssertionParser.parse(Shell.run("/usr/bin/pmset", ["-g", "assertions"]))
-            .filter(AssertionParser.preventsSleep)
+        let assertions = Assertions.current().filter(Assertions.preventsSleep)
         let byPid = Dictionary(grouping: assertions, by: \.pid)
         guard !byPid.isEmpty else { return Snapshot() }
 
@@ -82,8 +82,9 @@ enum Poller {
                 processName: list[0].processName,
                 command: d?.args ?? list[0].processName,
                 parent: parentDescription(pid: pid, table: table, tmuxPanes: tmuxPanes),
-                running: d.map { AssertionParser.formatElapsed($0.etime) } ?? list[0].age,
-                holds: Array(Set(list.map { AssertionParser.label(for: $0.type) })).sorted()
+                running: d.map { Duration.format(seconds: Duration.seconds(etime: $0.etime)) } ?? "?",
+                holds: Array(Set(list.map { Assertions.label(for: $0.type) })).sorted(),
+                endsIn: list.compactMap(\.timeLeft).max().map { Duration.format(seconds: Int($0)) }
             )
         }
         .sorted { ($0.isCaffeinate ? 0 : 1, $0.pid) < ($1.isCaffeinate ? 0 : 1, $1.pid) }

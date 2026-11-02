@@ -1,0 +1,20 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: ./build.sh
+      - name: Smoke-test the CLI
+        run: |
+          ln -s "$PWD/build/CaffeineWatch.app/Contents/MacOS/CaffeineWatch" caffeine-watch
+          ./caffeine-watch status
+          ./caffeine-watch help

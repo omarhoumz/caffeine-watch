@@ -18,10 +18,10 @@ Click the icon for details on every process that holds a sleep assertion:
 
 - the full command line, e.g. `caffeinate -dims`
 - pid, and its parent, shown as the tmux session name when it runs inside tmux
-- how long it has been running
+- how long it has been running, and when it ends if it has a timeout
 - what it prevents: display sleep, idle system sleep, system sleep, disk idle
 
-Actions: **Kill** a `caffeinate` process (asks first), **Turn display off now**, **Launch at login**, **Quit**.
+Actions: **Keep awake** for 1 hour, 4 hours or until stopped (with or without the display), **Kill** a `caffeinate` process (asks first), **Turn display off now**, **Launch at login**, **Quit**.
 
 ## Install
 
@@ -85,7 +85,12 @@ The menu bar icon updates every 5 seconds. Click it for details.
 From a terminal:
 
 ```sh
-caffeine-watch status
+caffeine-watch                     # same as `caffeine-watch status`
+caffeine-watch start 2h --display  # keep the Mac and display awake for 2 hours
+caffeine-watch start               # keep the Mac awake until stopped (display may sleep)
+caffeine-watch stop                # stop every caffeinate; `stop <pid>` for one
+caffeine-watch check               # silent; exit 0 if caffeinate is running, 1 otherwise
+caffeine-watch help
 ```
 
 ```
@@ -99,17 +104,19 @@ Other apps:
     prevents: idle system
 ```
 
-For scripts, `check` prints nothing and exits 0 while `caffeinate` is running, 1 otherwise:
+`start` runs `/usr/bin/caffeinate -ims` (plus `-d` with `--display`, `-t` with a duration) in its own session, so it keeps running after the terminal or the app closes. Durations: `90` (seconds), `45m`, `2h`, `1h30m`, `1d`.
+
+`check` is for scripts:
 
 ```sh
-caffeine-watch check || caffeinate -dims &
+caffeine-watch check || caffeine-watch start
 ```
 
 ## How it works
 
 Every 5 seconds the app runs:
 
-- `pmset -g assertions` to list the processes holding power assertions
+- `IOPMCopyAssertionsByProcess` (IOKit, the same data `pmset -g assertions` prints) to list the processes holding power assertions
 - `ps` for each holder's command line, uptime and parent chain
 - `tmux list-panes -a` (when tmux is installed) to map a process or its ancestors to a session name
 
@@ -121,22 +128,23 @@ Nothing runs as root and nothing leaves the machine.
 
 ```sh
 swift build                                  # debug build
-swift run CaffeineWatch status               # CLI output, no app bundle needed
+swift run CaffeineWatch status               # CLI, no app bundle needed
 ./build.sh && open build/CaffeineWatch.app   # run the menu bar app from the repo
 ```
 
 | Path | What |
 | --- | --- |
-| `Sources/CaffeineWatch/Parser.swift` | Parses `pmset -g assertions`, decides what counts as preventing sleep |
-| `Sources/CaffeineWatch/Poller.swift` | Runs `pmset` / `ps` / `tmux` and builds a snapshot |
+| `Sources/CaffeineWatch/Assertions.swift` | Reads power assertions from IOKit, decides what counts as preventing sleep |
+| `Sources/CaffeineWatch/Poller.swift` | Adds `ps` / `tmux` details and builds a snapshot |
+| `Sources/CaffeineWatch/KeepAwake.swift` | Starts and stops `caffeinate` |
 | `Sources/CaffeineWatch/App.swift` | SwiftUI `MenuBarExtra` and popover |
 | `Sources/CaffeineWatch/Icon.swift` | Menu bar icon, drawn in code as a template image |
-| `Sources/CaffeineWatch/main.swift` | Entry point: `status` CLI or the app |
+| `Sources/CaffeineWatch/main.swift` | Entry point: CLI commands, or the app when launched bare |
 | `scripts/make-icon.swift` | Regenerates `Resources/AppIcon.icns` (`swift scripts/make-icon.swift`) |
 | `build.sh` | Builds the `.app` bundle (`LSUIElement`, so no Dock icon) and ad-hoc signs it |
 | `install.sh` | Builds, installs to `~/Applications`, links the CLI |
 
-There is no Xcode project; Swift Package Manager plus `build.sh` is the whole build.
+There is no Xcode project; Swift Package Manager plus `build.sh` is the whole build. `build.sh` stamps the version from the latest git tag (or `VERSION=1.2.3 ./build.sh`).
 
 ## Contribute
 
