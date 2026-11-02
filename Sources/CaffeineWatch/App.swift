@@ -167,8 +167,7 @@ struct CaffeineWatchApp: App {
         MenuBarExtra {
             MenuContent(model: model)
         } label: {
-            Image(nsImage: MenuBarIcon.image(for: model.snapshot.state))
-            if let left = model.snapshot.countdown { Text(left) }
+            Image(nsImage: MenuBarIcon.image(for: model.snapshot.state, text: model.snapshot.countdown))
         }
         .menuBarExtraStyle(.window)
     }

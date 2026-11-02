@@ -54,17 +54,18 @@ enum Assertions {
 }
 
 enum Duration {
-    /// "20d 19h", "3h 12m", "4m".
+    /// "20d 19h", "3h 12m", "1h", "4m".
     static func format(seconds: Int) -> String {
         let d = seconds / 86400, h = seconds % 86400 / 3600, m = seconds % 3600 / 60
-        if d > 0 { return "\(d)d \(h)h" }
-        if h > 0 { return "\(h)h \(m)m" }
+        if d > 0 { return h > 0 ? "\(d)d \(h)h" : "\(d)d" }
+        if h > 0 { return m > 0 ? "\(h)h \(m)m" : "\(h)h" }
         return "\(m)m"
     }
 
-    /// Time until `end`, rounded up to the minute so 2m58s reads "3m".
+    /// Time until `end`, rounded up to the minute so 2m58s reads "3m"; seconds in the last minute.
     static func remaining(until end: Date) -> String {
-        format(seconds: max(0, Int(end.timeIntervalSinceNow.rounded(.up))) + 59)
+        let left = max(0, Int(end.timeIntervalSinceNow.rounded(.up)))
+        return left < 60 ? "\(left)s" : format(seconds: left + 59)
     }
 
     /// `ps` etime: [[dd-]hh:]mm:ss.

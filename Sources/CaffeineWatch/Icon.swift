@@ -1,10 +1,19 @@
 import AppKit
 
-/// Template menu bar icon: a mug that is steaming (caffeinate), full (another app), or empty (idle).
+/// Template menu bar icon: a mug that is steaming (caffeinate), full (another app), or empty (idle),
+/// optionally followed by text. The text is drawn into the image because a MenuBarExtra label
+/// shows only its image when given an image and a text.
 enum MenuBarIcon {
-    static func image(for state: WakeState) -> NSImage {
-        let size = NSSize(width: 18, height: 18)
+    private static let font = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium)
+
+    static func image(for state: WakeState, text: String? = nil) -> NSImage {
+        let label = text.map { NSAttributedString(string: $0, attributes: [.font: font, .foregroundColor: NSColor.black]) }
+        let textWidth = label.map { ceil($0.size().width) + 3 } ?? 0
+        let size = NSSize(width: 18 + textWidth, height: 18)
         let image = NSImage(size: size, flipped: false) { _ in
+            if let label {
+                label.draw(at: NSPoint(x: 21, y: (18 - label.size().height) / 2))
+            }
             NSColor.black.setStroke()
             NSColor.black.setFill()
 
