@@ -178,7 +178,7 @@ struct MenuContent: View {
             if !s.others.isEmpty {
                 Divider()
                 Button {
-                    withAnimation(.easeOut(duration: 0.15)) { showOthers.toggle() }
+                    showOthers.toggle()
                 } label: {
                     HStack {
                         Image(systemName: "chevron.right")
@@ -211,6 +211,7 @@ struct MenuContent: View {
         }
         .padding(14)
         .frame(width: 400)
+        .frame(maxHeight: .infinity, alignment: .top)
     }
 
     private func title(_ s: Snapshot) -> String {
