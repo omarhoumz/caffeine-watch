@@ -4,7 +4,7 @@ A macOS menu bar app (and CLI) that shows whether something is keeping your Mac 
 
 Handy when you run `caffeinate` in a tmux session or background job and want to know at a glance that it is still running, how long it has been up, and which session owns it.
 
-<img src="docs/popover.png" alt="CaffeineWatch popover showing caffeinate -dims running in tmux session work" width="468">
+<img src="docs/popover.png" alt="CaffeineWatch popover showing caffeinate -dims -t 3600 running in tmux session work" width="400">
 
 ![Menu bar icon states](docs/icons.png)
 
@@ -16,12 +16,14 @@ Handy when you run `caffeinate` in a tmux session or background job and want to 
 
 Click the icon for details on every process that holds a sleep assertion:
 
-- the full command line, e.g. `caffeinate -dims`
-- pid, and its parent, shown as the tmux session name when it runs inside tmux
-- how long it has been running, and when it ends if it has a timeout (also shown next to the menu bar icon)
-- what it prevents: display sleep, idle system sleep, system sleep, disk idle
+- the full command line, e.g. `caffeinate -dims`, and which tmux session or parent started it
+- what it prevents: display, idle, system or disk sleep
+- for a timed `caffeinate`, a progress bar and the time it ends (the time left also shows next to the menu bar icon)
+- other apps by name and icon; hover a row for its command line, pid, parent and uptime
 
-Actions: **Keep awake** for 1 hour, 4 hours or until stopped (with or without the display), **Stop** a `caffeinate` process (asks first), **Turn display off now**, **Launch at login**, **Quit**.
+Actions: **Keep awake** for 1 hour, 4 hours or until stopped, with or without the display, and **Stop** a `caffeinate` process (asks first). The **⋯** menu has **Turn display off now**, **Launch at login** and **Quit**.
+
+Right-click the menu bar icon to keep awake, stop `caffeinate` or turn the display off without opening the popover.
 
 ## Install
 
@@ -142,7 +144,8 @@ swift run CaffeineWatch status               # CLI, no app bundle needed
 | `Sources/CaffeineWatch/Assertions.swift` | Reads power assertions from IOKit, decides what counts as preventing sleep |
 | `Sources/CaffeineWatch/Poller.swift` | Adds `ps` / `tmux` details and builds a snapshot |
 | `Sources/CaffeineWatch/KeepAwake.swift` | Starts and stops `caffeinate` |
-| `Sources/CaffeineWatch/App.swift` | SwiftUI `MenuBarExtra` and popover |
+| `Sources/CaffeineWatch/App.swift` | Status item, SwiftUI popover and right-click menu |
+| `Sources/CaffeineWatch/AppIdentity.swift` | App name and icon for a process, with names for common system daemons |
 | `Sources/CaffeineWatch/Icon.swift` | Menu bar icon, drawn in code as a template image |
 | `Sources/CaffeineWatch/main.swift` | Entry point: CLI commands, or the app when launched bare |
 | `scripts/make-icon.swift` | Regenerates `Resources/AppIcon.icns` (`swift scripts/make-icon.swift`) |

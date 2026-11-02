@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import ServiceManagement
 import SwiftUI
 
@@ -39,8 +40,13 @@ final class Model: ObservableObject {
         }
     }
 
-    func keepAwake(seconds: Int?, display: Bool) {
-        KeepAwake.start(seconds: seconds, display: display)
+    var keepDisplayOn: Bool {
+        get { UserDefaults.standard.object(forKey: "keepDisplayOn") as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: "keepDisplayOn") }
+    }
+
+    func keepAwake(seconds: Int?) {
+        KeepAwake.start(seconds: seconds, display: keepDisplayOn)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { self.refresh() }
     }
 
@@ -54,25 +60,85 @@ final class Model: ObservableObject {
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         _ = KeepAwake.stop([h.pid])
     }
+
+    func stopAll() { _ = KeepAwake.stop(snapshot.caffeinate.map(\.pid)) }
+
+    func displayOff() { _ = Shell.run("/usr/bin/pmset", ["displaysleepnow"]) }
+
+    var launchAtLogin: Bool {
+        get { SMAppService.mainApp.status == .enabled }
+        set { try? newValue ? SMAppService.mainApp.register() : SMAppService.mainApp.unregister() }
+    }
 }
 
-struct HolderView: View {
+private let shortLabels = ["display": "display", "idle system": "idle", "system sleep": "system", "disk idle": "disk"]
+
+struct Chip: View {
+    let label: String
+    var body: some View {
+        Text(shortLabels[label] ?? label).font(.caption2.weight(.medium))
+            .padding(.horizontal, 6).padding(.vertical, 2)
+            .background(Capsule().fill(Color.accentColor.opacity(0.2)))
+            .foregroundStyle(Color.accentColor)
+            .help("Prevents \(label.hasSuffix("sleep") ? label : label + " sleep")")
+    }
+}
+
+private func detail(_ h: Holder) -> String { "pid \(h.pid) · \(h.parent) · up \(h.running)" }
+
+struct CaffeinateCard: View {
     let holder: Holder
-    let onStop: (() -> Void)?
+    let onStop: () -> Void
+    @State private var hovering = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack {
-                Text(holder.command).font(.system(.body, design: .monospaced)).lineLimit(2).textSelection(.enabled)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .top) {
+                Text(holder.command).font(.system(.callout, design: .monospaced)).lineLimit(2).textSelection(.enabled)
                 Spacer()
-                if let onStop { Button("Stop", action: onStop).controlSize(.small) }
+                Button("Stop", action: onStop).controlSize(.small)
             }
-            Text(verbatim: "pid \(holder.pid) · \(holder.parent) · up \(holder.running)"
-                + (holder.endsIn.map { " · ends in \($0)" } ?? ""))
-                .font(.caption).foregroundStyle(.secondary)
-            Text("prevents: " + holder.holds.joined(separator: ", "))
-                .font(.caption).foregroundStyle(.secondary)
+            HStack(spacing: 4) { ForEach(holder.holds, id: \.self, content: Chip.init) }
+            if let start = holder.startedAt, let end = holder.endsAt, end > start {
+                let total = end.timeIntervalSince(start), elapsed = Date().timeIntervalSince(start)
+                ProgressView(value: min(max(elapsed / total, 0), 1)).progressViewStyle(.linear)
+                Text(verbatim: "\(Duration.format(seconds: Int(elapsed))) of \(Duration.format(seconds: Int(total) + 30))"
+                    + " · ends \(end.formatted(date: .omitted, time: .shortened))")
+                    .font(.caption2).foregroundStyle(.secondary)
+            } else {
+                Text(verbatim: "up \(holder.running) · until stopped").font(.caption2).foregroundStyle(.secondary)
+            }
+            if hovering { Text(verbatim: detail(holder)).font(.caption2).foregroundStyle(.secondary) }
         }
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.05)))
+        .onHover { hovering = $0 }
+    }
+}
+
+struct OtherRow: View {
+    let holder: Holder
+    @State private var hovering = false
+
+    var body: some View {
+        let id = AppIdentity.of(holder)
+        HStack(alignment: .top, spacing: 8) {
+            Image(nsImage: id.icon).resizable().frame(width: 20, height: 20).foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack {
+                    Text(id.name)
+                    Spacer()
+                    HStack(spacing: 4) { ForEach(holder.holds, id: \.self, content: Chip.init) }
+                }
+                if hovering {
+                    Text(holder.command).font(.caption2.monospaced()).lineLimit(2).textSelection(.enabled)
+                    Text(verbatim: detail(holder)).font(.caption2).foregroundStyle(.secondary)
+                }
+            }
+        }
+        .padding(6)
+        .background(RoundedRectangle(cornerRadius: 6).fill(hovering ? Color.primary.opacity(0.07) : .clear))
+        .onHover { hovering = $0 }
     }
 }
 
@@ -80,18 +146,29 @@ struct MenuContent: View {
     @ObservedObject var model: Model
     @State private var showOthers = false
     @AppStorage("keepDisplayOn") private var keepDisplayOn = true
-    @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
         let s = model.snapshot
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 6) {
-                Image(nsImage: MenuBarIcon.image(for: s.state))
-                Text(headline(s)).font(.headline)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(nsImage: MenuBarIcon.image(for: s.state)).resizable().frame(width: 22, height: 22)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title(s)).font(.headline)
+                    Text(verbatim: subtitle(s)).font(.caption).foregroundStyle(.secondary)
+                }
             }
 
-            if !s.caffeinate.isEmpty {
-                ForEach(s.caffeinate) { h in HolderView(holder: h) { model.stop(h) } }
+            ForEach(s.caffeinate) { h in CaffeinateCard(holder: h) { model.stop(h) } }
+
+            HStack(spacing: 6) {
+                Text("Keep awake").foregroundStyle(.secondary)
+                Spacer()
+                Button("1h") { model.keepAwake(seconds: 3600) }
+                Button("4h") { model.keepAwake(seconds: 4 * 3600) }
+                Button { model.keepAwake(seconds: nil) } label: { Image(systemName: "infinity") }
+                    .help("Until stopped")
+                Divider().frame(height: 16)
+                Toggle("Keep display on", isOn: $keepDisplayOn)
             }
 
             if !s.others.isEmpty {
@@ -110,65 +187,133 @@ struct MenuContent: View {
                 }
                 .buttonStyle(.plain)
                 if showOthers {
-                    VStack(alignment: .leading, spacing: 8) {
-                        ForEach(s.others) { h in HolderView(holder: h, onStop: nil) }
-                    }
+                    VStack(alignment: .leading, spacing: 2) { ForEach(s.others) { OtherRow(holder: $0) } }
                 }
             }
 
             Divider()
             HStack {
-                Menu("Keep awake") {
-                    Button("1 hour") { model.keepAwake(seconds: 3600, display: keepDisplayOn) }
-                    Button("4 hours") { model.keepAwake(seconds: 4 * 3600, display: keepDisplayOn) }
-                    Button("Until stopped") { model.keepAwake(seconds: nil, display: keepDisplayOn) }
-                }
-                .fixedSize()
-                Toggle("Keep display on", isOn: $keepDisplayOn)
+                Text("Updated \(s.updated.formatted(date: .omitted, time: .standard))")
+                    .font(.caption2).foregroundStyle(.tertiary)
                 Spacer()
+                Button { model.refresh() } label: { Image(systemName: "arrow.clockwise") }
+                    .buttonStyle(.borderless).help("Refresh")
+                Menu {
+                    Button("Turn display off now", action: model.displayOff)
+                    Toggle("Launch at login", isOn: Binding(get: { model.launchAtLogin }, set: { model.launchAtLogin = $0 }))
+                    Divider()
+                    Button("Quit") { NSApp.terminate(nil) }
+                } label: { Image(systemName: "ellipsis.circle") }
+                .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
             }
-            HStack {
-                Button("Turn display off now") { _ = Shell.run("/usr/bin/pmset", ["displaysleepnow"]) }
-                Spacer()
-                Button("Refresh") { model.refresh() }
-            }
-            HStack {
-                Toggle("Launch at login", isOn: $launchAtLogin)
-                    .onChange(of: launchAtLogin) { on in
-                        do {
-                            if on { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
-                        } catch {
-                            launchAtLogin = SMAppService.mainApp.status == .enabled
-                        }
-                    }
-                Spacer()
-                Button("Quit") { NSApp.terminate(nil) }
-            }
-            Text("Updated \(s.updated.formatted(date: .omitted, time: .standard))")
-                .font(.caption2).foregroundStyle(.tertiary)
         }
-        .padding(12)
-        .frame(width: 420)
+        .padding(14)
+        .frame(width: 400)
     }
 
-    private func headline(_ s: Snapshot) -> String {
+    private func title(_ s: Snapshot) -> String {
         switch s.state {
-        case .caffeinate: return "caffeinate is keeping the Mac awake"
-        case .other: return "Another app is preventing sleep"
+        case .caffeinate:
+            return s.caffeinate.contains { $0.holds.contains("display") } ? "Mac and display awake" : "Mac awake, display can sleep"
+        case .other:
+            let names = Array(Set(s.others.map { AppIdentity.of($0).name })).sorted()
+            return names.count == 1 ? "\(names[0]) is keeping the Mac awake" : "\(names.count) apps are keeping the Mac awake"
+        case .idle:
+            return "Mac can sleep"
+        }
+    }
+
+    private func subtitle(_ s: Snapshot) -> String {
+        switch s.state {
+        case .caffeinate:
+            guard s.caffeinate.count == 1, let h = s.caffeinate.first else { return "\(s.caffeinate.count) caffeinate processes" }
+            return "caffeinate · \(h.parent) · " + (h.endsIn.map { "ends in \($0)" } ?? "until stopped")
+        case .other: return "caffeinate isn't running"
         case .idle: return "Nothing is preventing sleep"
         }
     }
 }
 
-struct CaffeineWatchApp: App {
-    @StateObject private var model = Model()
+/// A status item rather than `MenuBarExtra`, which can't tell a right click from a left one.
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    private let model = Model()
+    private var statusItem: NSStatusItem!
+    private let popover = NSPopover()
+    private var sub: AnyCancellable?
 
-    var body: some Scene {
-        MenuBarExtra {
-            MenuContent(model: model)
-        } label: {
-            Image(nsImage: MenuBarIcon.image(for: model.snapshot.state, text: model.snapshot.countdown))
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        let button = statusItem.button!
+        button.target = self
+        button.action = #selector(clicked)
+        button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+        sub = model.$snapshot.sink { s in button.image = MenuBarIcon.image(for: s.state, text: s.countdown) }
+
+        let host = NSHostingController(rootView: MenuContent(model: model))
+        host.sizingOptions = .preferredContentSize
+        popover.contentViewController = host
+        popover.behavior = .transient
+    }
+
+    @objc private func clicked(_ sender: NSStatusBarButton) {
+        let event = NSApp.currentEvent
+        if event?.type == .rightMouseUp || event?.modifierFlags.contains(.control) == true {
+            popover.performClose(nil)
+            statusItem.menu = shortcuts()
+            sender.performClick(nil)
+            statusItem.menu = nil
+        } else if popover.isShown {
+            popover.performClose(nil)
+        } else {
+            model.refresh()
+            NSApp.activate(ignoringOtherApps: true)
+            popover.show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)
         }
-        .menuBarExtraStyle(.window)
+    }
+
+    private func shortcuts() -> NSMenu {
+        let menu = NSMenu()
+        menu.addItem(withTitle: "Keep awake for 1 hour", key: "1") { [model] in model.keepAwake(seconds: 3600) }
+        menu.addItem(withTitle: "Keep awake for 4 hours", key: "4") { [model] in model.keepAwake(seconds: 4 * 3600) }
+        menu.addItem(withTitle: "Keep awake until stopped", key: "0") { [model] in model.keepAwake(seconds: nil) }
+        menu.addItem(withTitle: "Keep display on", key: "d") { [model] in model.keepDisplayOn.toggle() }
+            .state = model.keepDisplayOn ? .on : .off
+        let running = model.snapshot.caffeinate.count
+        if running > 0 {
+            menu.addItem(.separator())
+            menu.addItem(withTitle: running == 1 ? "Stop caffeinate" : "Stop all \(running) caffeinate", key: "s") { [model] in model.stopAll() }
+        }
+        menu.addItem(.separator())
+        menu.addItem(withTitle: "Turn display off now", key: "") { [model] in model.displayOff() }
+        menu.addItem(withTitle: "Quit", key: "q") { NSApp.terminate(nil) }
+        return menu
+    }
+}
+
+private final class ActionItem: NSMenuItem {
+    private let handler: () -> Void
+    init(_ title: String, key: String, handler: @escaping () -> Void) {
+        self.handler = handler
+        super.init(title: title, action: #selector(run), keyEquivalent: key)
+        target = self
+    }
+    required init(coder: NSCoder) { fatalError() }
+    @objc private func run() { handler() }
+}
+
+private extension NSMenu {
+    @discardableResult
+    func addItem(withTitle title: String, key: String, handler: @escaping () -> Void) -> NSMenuItem {
+        let item = ActionItem(title, key: key, handler: handler)
+        addItem(item)
+        return item
+    }
+}
+
+enum CaffeineWatchApp {
+    static func main() {
+        let delegate = AppDelegate()
+        NSApplication.shared.delegate = delegate
+        NSApplication.shared.run()
     }
 }
