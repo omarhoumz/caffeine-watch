@@ -1,0 +1,22 @@
+#compdef caffeine-watch
+
+_caffeine-watch() {
+  local -a commands
+  commands=(
+    'status:show what is keeping the Mac awake'
+    'check:exit 0 if caffeinate is running, 1 otherwise'
+    'start:start caffeinate in the background'
+    'stop:stop one caffeinate, or all of them'
+    'help:show usage'
+  )
+  if (( CURRENT == 2 )); then
+    _describe 'command' commands
+    return
+  fi
+  case $words[2] in
+    start) _alternative 'durations:duration:(30m 1h 2h 4h 8h)' 'flags:flag:(--display)' ;;
+    stop) _values 'caffeinate pid' ${(f)"$(pgrep -x caffeinate)"} ;;
+  esac
+}
+
+_caffeine-watch "$@"

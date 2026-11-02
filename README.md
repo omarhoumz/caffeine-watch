@@ -18,10 +18,10 @@ Click the icon for details on every process that holds a sleep assertion:
 
 - the full command line, e.g. `caffeinate -dims`
 - pid, and its parent, shown as the tmux session name when it runs inside tmux
-- how long it has been running, and when it ends if it has a timeout
+- how long it has been running, and when it ends if it has a timeout (also shown next to the menu bar icon)
 - what it prevents: display sleep, idle system sleep, system sleep, disk idle
 
-Actions: **Keep awake** for 1 hour, 4 hours or until stopped (with or without the display), **Kill** a `caffeinate` process (asks first), **Turn display off now**, **Launch at login**, **Quit**.
+Actions: **Keep awake** for 1 hour, 4 hours or until stopped (with or without the display), **Stop** a `caffeinate` process (asks first), **Turn display off now**, **Launch at login**, **Quit**.
 
 ## Install
 
@@ -106,6 +106,8 @@ Other apps:
 
 `start` runs `/usr/bin/caffeinate -ims` (plus `-d` with `--display`, `-t` with a duration) in its own session, so it keeps running after the terminal or the app closes. Durations: `90` (seconds), `45m`, `2h`, `1h30m`, `1d`.
 
+Shell completions for zsh, bash and fish come with the Homebrew cask. From a source build, they are in `completions/`.
+
 `check` is for scripts:
 
 ```sh
@@ -114,11 +116,14 @@ caffeine-watch check || caffeine-watch start
 
 ## How it works
 
-Every 5 seconds the app runs:
+Every 5 seconds the app calls `IOPMCopyAssertionsByProcess` (IOKit, the same data `pmset -g assertions` prints) to list the processes holding power assertions. macOS posts no usable notification when assertions change, so this is a poll, but a cheap one: a single system call.
 
-- `IOPMCopyAssertionsByProcess` (IOKit, the same data `pmset -g assertions` prints) to list the processes holding power assertions
-- `ps` for each holder's command line, uptime and parent chain
-- `tmux list-panes -a` (when tmux is installed) to map a process or its ancestors to a session name
+When a process appears for the first time, it also runs:
+
+- `ps` for its command line, start time and parent chain
+- `tmux list-panes -a` (when tmux is installed) to map the process or its ancestors to a session name
+
+Each `caffeinate` is also watched for exit, so the icon changes the moment one stops.
 
 Assertions that are always present are ignored: powerd's "prevent sleep while display is on", WindowServer's `UserIsActive`, and `BackgroundTask`. Without this the icon would never show idle.
 
@@ -143,6 +148,7 @@ swift run CaffeineWatch status               # CLI, no app bundle needed
 | `scripts/make-icon.swift` | Regenerates `Resources/AppIcon.icns` (`swift scripts/make-icon.swift`) |
 | `build.sh` | Builds the `.app` bundle (`LSUIElement`, so no Dock icon) and ad-hoc signs it |
 | `install.sh` | Builds, installs to `~/Applications`, links the CLI |
+| `completions/` | zsh, bash and fish completions, bundled into the app's Resources |
 
 There is no Xcode project; Swift Package Manager plus `build.sh` is the whole build. `build.sh` stamps the version from the latest git tag (or `VERSION=1.2.3 ./build.sh`).
 

@@ -6,7 +6,7 @@ struct Assertion: Hashable {
     let processName: String
     let type: String
     let name: String
-    let timeLeft: TimeInterval?
+    let endsAt: Date?
 }
 
 enum Assertions {
@@ -23,10 +23,16 @@ enum Assertions {
                     processName: a["Process Name"] as? String ?? "?",
                     type: type,
                     name: a["AssertName"] as? String ?? "",
-                    timeLeft: a["AssertTimeoutTimeLeft"] as? TimeInterval
+                    endsAt: endDate(a)
                 )
             }
         }
+    }
+
+    /// TimeLeft is counted from the last update, not from now.
+    private static func endDate(_ a: [String: Any]) -> Date? {
+        guard let left = a["AssertTimeoutTimeLeft"] as? TimeInterval else { return nil }
+        return (a["AssertTimeoutUpdateTime"] as? Date ?? Date()).addingTimeInterval(left)
     }
 
     /// Assertions that actually keep the Mac awake. powerd's "while display is on",
@@ -54,6 +60,11 @@ enum Duration {
         if d > 0 { return "\(d)d \(h)h" }
         if h > 0 { return "\(h)h \(m)m" }
         return "\(m)m"
+    }
+
+    /// Time until `end`, rounded up to the minute so 2m58s reads "3m".
+    static func remaining(until end: Date) -> String {
+        format(seconds: max(0, Int(end.timeIntervalSinceNow.rounded(.up))) + 59)
     }
 
     /// `ps` etime: [[dd-]hh:]mm:ss.

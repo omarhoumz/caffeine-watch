@@ -12,6 +12,7 @@ APP=build/CaffeineWatch.app
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp Resources/AppIcon.icns "$APP/Contents/Resources/"
+cp -R completions "$APP/Contents/Resources/"
 cp .build/apple/Products/Release/CaffeineWatch "$APP/Contents/MacOS/"
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>

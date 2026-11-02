@@ -6,47 +6,66 @@ final class Model: ObservableObject {
     @Published var snapshot = Snapshot()
     private var timer: Timer?
     private let queue = DispatchQueue(label: "caffeine-watch.poll")
+    private let poller = Poller()
+    /// Exit watchers on caffeinate processes, so a stop shows up immediately rather than on the next poll.
+    private var exitWatchers: [Int32: DispatchSourceProcess] = [:]
 
     init() {
         refresh()
+        // powerd posts no usable change notification for assertions, so new holders are found by polling.
         timer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in self?.refresh() }
     }
 
     func refresh() {
         queue.async {
-            let s = Poller.snapshot()
-            DispatchQueue.main.async { self.snapshot = s }
+            let s = self.poller.snapshot()
+            DispatchQueue.main.async {
+                self.snapshot = s
+                self.watchExits(of: s.caffeinate.map(\.pid))
+            }
+        }
+    }
+
+    private func watchExits(of pids: [Int32]) {
+        for (pid, source) in exitWatchers where !pids.contains(pid) {
+            source.cancel()
+            exitWatchers[pid] = nil
+        }
+        for pid in pids where exitWatchers[pid] == nil {
+            let source = DispatchSource.makeProcessSource(identifier: pid, eventMask: .exit, queue: .main)
+            source.setEventHandler { [weak self] in self?.refresh() }
+            source.resume()
+            exitWatchers[pid] = source
         }
     }
 
     func keepAwake(seconds: Int?, display: Bool) {
         KeepAwake.start(seconds: seconds, display: display)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self.refresh() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { self.refresh() }
     }
 
-    func kill(_ h: Holder) {
+    func stop(_ h: Holder) {
         NSApp.activate(ignoringOtherApps: true)
         let alert = NSAlert()
-        alert.messageText = "Kill \(h.processName) (pid \(h.pid))?"
+        alert.messageText = "Stop \(h.processName) (pid \(h.pid))?"
         alert.informativeText = "\(h.command)\n\(h.parent)"
-        alert.addButton(withTitle: "Kill")
+        alert.addButton(withTitle: "Stop")
         alert.addButton(withTitle: "Cancel")
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         _ = KeepAwake.stop([h.pid])
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self.refresh() }
     }
 }
 
 struct HolderView: View {
     let holder: Holder
-    let onKill: (() -> Void)?
+    let onStop: (() -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack {
                 Text(holder.command).font(.system(.body, design: .monospaced)).lineLimit(2).textSelection(.enabled)
                 Spacer()
-                if let onKill { Button("Kill", action: onKill).controlSize(.small) }
+                if let onStop { Button("Stop", action: onStop).controlSize(.small) }
             }
             Text(verbatim: "pid \(holder.pid) · \(holder.parent) · up \(holder.running)"
                 + (holder.endsIn.map { " · ends in \($0)" } ?? ""))
@@ -72,7 +91,7 @@ struct MenuContent: View {
             }
 
             if !s.caffeinate.isEmpty {
-                ForEach(s.caffeinate) { h in HolderView(holder: h) { model.kill(h) } }
+                ForEach(s.caffeinate) { h in HolderView(holder: h) { model.stop(h) } }
             }
 
             if !s.others.isEmpty {
@@ -92,7 +111,7 @@ struct MenuContent: View {
                 .buttonStyle(.plain)
                 if showOthers {
                     VStack(alignment: .leading, spacing: 8) {
-                        ForEach(s.others) { h in HolderView(holder: h, onKill: nil) }
+                        ForEach(s.others) { h in HolderView(holder: h, onStop: nil) }
                     }
                 }
             }
@@ -149,6 +168,7 @@ struct CaffeineWatchApp: App {
             MenuContent(model: model)
         } label: {
             Image(nsImage: MenuBarIcon.image(for: model.snapshot.state))
+            if let left = model.snapshot.countdown { Text(left) }
         }
         .menuBarExtraStyle(.window)
     }

@@ -6,11 +6,13 @@ struct Holder: Identifiable, Hashable {
     let processName: String
     let command: String
     let parent: String
-    let running: String
+    let startedAt: Date?
     let holds: [String]
-    let endsIn: String?
+    let endsAt: Date?
 
     var isCaffeinate: Bool { processName == "caffeinate" }
+    var running: String { startedAt.map { Duration.format(seconds: Int(Date().timeIntervalSince($0))) } ?? "?" }
+    var endsIn: String? { endsAt.map(Duration.remaining) }
 }
 
 enum WakeState { case caffeinate, other, idle }
@@ -21,6 +23,12 @@ struct Snapshot {
 
     var caffeinate: [Holder] { holders.filter(\.isCaffeinate) }
     var others: [Holder] { holders.filter { !$0.isCaffeinate } }
+    /// Time left when every running caffeinate has a timeout; nil if any runs until stopped.
+    var countdown: String? {
+        let ends = caffeinate.map(\.endsAt)
+        guard !ends.isEmpty, !ends.contains(where: { $0 == nil }) else { return nil }
+        return ends.compactMap { $0 }.max().map(Duration.remaining)
+    }
     var state: WakeState {
         if !caffeinate.isEmpty { return .caffeinate }
         return others.isEmpty ? .idle : .other
@@ -43,14 +51,39 @@ enum Shell {
     }
 }
 
-enum Poller {
+/// Builds snapshots from power assertions. `ps` and `tmux` only run when a holder pid appears
+/// for the first time; afterwards a poll is a single IOKit call.
+final class Poller {
     private static let tmuxPaths = ["/opt/homebrew/bin/tmux", "/usr/local/bin/tmux", "/usr/bin/tmux"]
 
-    static func snapshot() -> Snapshot {
-        let assertions = Assertions.current().filter(Assertions.preventsSleep)
-        let byPid = Dictionary(grouping: assertions, by: \.pid)
-        guard !byPid.isEmpty else { return Snapshot() }
+    private struct Info { let processName: String; let command: String; let parent: String; let startedAt: Date? }
+    private var cache: [Int32: Info] = [:]
 
+    static func snapshot() -> Snapshot { Poller().snapshot() }
+
+    func snapshot() -> Snapshot {
+        let byPid = Dictionary(grouping: Assertions.current().filter(Assertions.preventsSleep), by: \.pid)
+        cache = cache.filter { pid, info in byPid[pid]?.first?.processName == info.processName }
+        let newPids = byPid.keys.filter { cache[$0] == nil }
+        if !newPids.isEmpty { describe(newPids, names: byPid.mapValues { $0[0].processName }) }
+
+        let holders = byPid.map { pid, list -> Holder in
+            let info = cache[pid]
+            return Holder(
+                pid: pid,
+                processName: list[0].processName,
+                command: info?.command ?? list[0].processName,
+                parent: info?.parent ?? "?",
+                startedAt: info?.startedAt,
+                holds: Array(Set(list.map { Assertions.label(for: $0.type) })).sorted(),
+                endsAt: list.compactMap(\.endsAt).max()
+            )
+        }
+        .sorted { ($0.isCaffeinate ? 0 : 1, $0.pid) < ($1.isCaffeinate ? 0 : 1, $1.pid) }
+        return Snapshot(holders: holders)
+    }
+
+    private func describe(_ pids: [Int32], names: [Int32: String]) {
         // pid → (ppid, comm) for the whole table, to walk ancestors.
         var table: [Int32: (ppid: Int32, comm: String)] = [:]
         for row in Shell.run("/bin/ps", ["-axo", "pid=,ppid=,comm="]).split(separator: "\n") {
@@ -60,7 +93,7 @@ enum Poller {
         }
 
         var detail: [Int32: (etime: String, args: String)] = [:]
-        let pidList = byPid.keys.map(String.init).joined(separator: ",")
+        let pidList = pids.map(String.init).joined(separator: ",")
         for row in Shell.run("/bin/ps", ["-o", "pid=,etime=,args=", "-p", pidList]).split(separator: "\n") {
             let f = row.split(separator: " ", maxSplits: 2, omittingEmptySubsequences: true)
             guard f.count == 3, let pid = Int32(f[0]) else { continue }
@@ -68,27 +101,23 @@ enum Poller {
         }
 
         var tmuxPanes: [Int32: String] = [:]
-        if let tmux = tmuxPaths.first(where: FileManager.default.isExecutableFile) {
+        if let tmux = Self.tmuxPaths.first(where: FileManager.default.isExecutableFile) {
             for row in Shell.run(tmux, ["list-panes", "-a", "-F", "#{pane_pid} #{session_name}"]).split(separator: "\n") {
                 let f = row.split(separator: " ", maxSplits: 1)
                 if f.count == 2, let pid = Int32(f[0]) { tmuxPanes[pid] = String(f[1]) }
             }
         }
 
-        let holders = byPid.map { pid, list -> Holder in
+        let now = Date()
+        for pid in pids {
             let d = detail[pid]
-            return Holder(
-                pid: pid,
-                processName: list[0].processName,
-                command: d?.args ?? list[0].processName,
-                parent: parentDescription(pid: pid, table: table, tmuxPanes: tmuxPanes),
-                running: d.map { Duration.format(seconds: Duration.seconds(etime: $0.etime)) } ?? "?",
-                holds: Array(Set(list.map { Assertions.label(for: $0.type) })).sorted(),
-                endsIn: list.compactMap(\.timeLeft).max().map { Duration.format(seconds: Int($0)) }
+            cache[pid] = Info(
+                processName: names[pid] ?? "?",
+                command: d?.args ?? names[pid] ?? "?",
+                parent: Self.parentDescription(pid: pid, table: table, tmuxPanes: tmuxPanes),
+                startedAt: d.map { now.addingTimeInterval(-Double(Duration.seconds(etime: $0.etime))) }
             )
         }
-        .sorted { ($0.isCaffeinate ? 0 : 1, $0.pid) < ($1.isCaffeinate ? 0 : 1, $1.pid) }
-        return Snapshot(holders: holders)
     }
 
     /// Prefers the tmux session owning the process (or an ancestor); else the direct parent.
