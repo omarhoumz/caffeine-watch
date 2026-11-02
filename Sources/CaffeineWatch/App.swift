@@ -43,7 +43,7 @@ struct HolderView: View {
                 Spacer()
                 if let onKill { Button("Kill", action: onKill).controlSize(.small) }
             }
-            Text("pid \(holder.pid) · \(holder.parent) · up \(holder.running)")
+            Text(verbatim: "pid \(holder.pid) · \(holder.parent) · up \(holder.running)")
                 .font(.caption).foregroundStyle(.secondary)
             Text("prevents: " + holder.holds.joined(separator: ", "))
                 .font(.caption).foregroundStyle(.secondary)
