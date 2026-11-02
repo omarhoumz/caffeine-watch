@@ -53,6 +53,7 @@ struct HolderView: View {
 
 struct MenuContent: View {
     @ObservedObject var model: Model
+    @State private var showOthers = false
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
@@ -66,10 +67,23 @@ struct MenuContent: View {
 
             if !s.others.isEmpty {
                 Divider()
-                DisclosureGroup("Other apps (\(s.others.count))") {
+                Button {
+                    withAnimation(.easeOut(duration: 0.15)) { showOthers.toggle() }
+                } label: {
+                    HStack {
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                            .rotationEffect(.degrees(showOthers ? 90 : 0))
+                        Text("Other apps (\(s.others.count))")
+                        Spacer()
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                if showOthers {
                     VStack(alignment: .leading, spacing: 8) {
                         ForEach(s.others) { h in HolderView(holder: h, onKill: nil) }
-                    }.padding(.top, 4)
+                    }
                 }
             }
 
@@ -114,16 +128,9 @@ struct CaffeineWatchApp: App {
         MenuBarExtra {
             MenuContent(model: model)
         } label: {
-            Image(systemName: symbol(model.snapshot.state))
+            Image(nsImage: MenuBarIcon.image(for: model.snapshot.state))
         }
         .menuBarExtraStyle(.window)
     }
 
-    private func symbol(_ state: WakeState) -> String {
-        switch state {
-        case .caffeinate: return "cup.and.heat.waves.fill"
-        case .other: return "cup.and.saucer.fill"
-        case .idle: return "cup.and.saucer"
-        }
-    }
 }
