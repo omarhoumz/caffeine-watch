@@ -6,8 +6,13 @@ func printHolder(_ h: Holder) {
     print("    prevents: \(h.holds.joined(separator: ", "))")
 }
 
-// CLI mode: `CaffeineWatch status` (or the older `--dump`). Exit 0 when caffeinate is running, 1 otherwise.
 let args = CommandLine.arguments.dropFirst()
+
+// `check`: silent, for scripts. Exit 0 when caffeinate is running, 1 otherwise.
+if args.first == "check" {
+    exit(Poller.snapshot().state == .caffeinate ? 0 : 1)
+}
+
 if args.first == "status" || args.contains("--dump") {
     let s = Poller.snapshot()
     switch s.state {
@@ -20,7 +25,7 @@ if args.first == "status" || args.contains("--dump") {
         print("Other apps:")
         s.others.forEach(printHolder)
     }
-    exit(s.state == .caffeinate ? 0 : 1)
+    exit(0)
 }
 
 CaffeineWatchApp.main()

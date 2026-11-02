@@ -69,10 +69,10 @@ Other apps:
     prevents: idle system
 ```
 
-The exit code is 0 while `caffeinate` is running and 1 otherwise, so it works in scripts:
+For scripts, `check` prints nothing and exits 0 while `caffeinate` is running, 1 otherwise:
 
 ```sh
-caffeine-watch status >/dev/null || caffeinate -dims &
+caffeine-watch check || caffeinate -dims &
 ```
 
 ## How it works
