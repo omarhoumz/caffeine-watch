@@ -11,7 +11,7 @@ let args = CommandLine.arguments.dropFirst()
 if args.first == "status" || args.contains("--dump") {
     let s = Poller.snapshot()
     switch s.state {
-    case .caffeinate: print("☕ caffeinate is keeping the Mac awake")
+    case .caffeinate: print("caffeinate is keeping the Mac awake")
     case .other: print("Another app is preventing sleep")
     case .idle: print("Nothing is preventing sleep")
     }

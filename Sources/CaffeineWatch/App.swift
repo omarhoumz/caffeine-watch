@@ -59,7 +59,10 @@ struct MenuContent: View {
     var body: some View {
         let s = model.snapshot
         VStack(alignment: .leading, spacing: 10) {
-            Text(headline(s)).font(.headline)
+            HStack(spacing: 6) {
+                Image(nsImage: MenuBarIcon.image(for: s.state))
+                Text(headline(s)).font(.headline)
+            }
 
             if !s.caffeinate.isEmpty {
                 ForEach(s.caffeinate) { h in HolderView(holder: h) { model.kill(h) } }
@@ -114,7 +117,7 @@ struct MenuContent: View {
 
     private func headline(_ s: Snapshot) -> String {
         switch s.state {
-        case .caffeinate: return "☕ caffeinate is keeping the Mac awake"
+        case .caffeinate: return "caffeinate is keeping the Mac awake"
         case .other: return "Another app is preventing sleep"
         case .idle: return "Nothing is preventing sleep"
         }
@@ -132,5 +135,4 @@ struct CaffeineWatchApp: App {
         }
         .menuBarExtraStyle(.window)
     }
-
 }
