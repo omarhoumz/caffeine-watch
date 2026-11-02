@@ -23,8 +23,15 @@ Most bugs come from a `pmset` line format the parser hasn't seen, so the raw out
 
 If you change the icon, update both `Sources/CaffeineWatch/Icon.swift` and `scripts/make-icon.swift`, then regenerate `Resources/AppIcon.icns`.
 
+## Releasing (maintainer)
+
+1. Bump `CFBundleShortVersionString` in `build.sh`, commit, tag `vX.Y.Z`, push.
+2. `./build.sh && ditto -c -k --keepParent build/CaffeineWatch.app build/CaffeineWatch.zip`
+3. `gh release create vX.Y.Z build/CaffeineWatch.zip`
+4. In [omarhoumz/homebrew-tap](https://github.com/omarhoumz/homebrew-tap), update `version` and `sha256` in `Casks/caffeine-watch.rb`.
+
 ## Ideas welcome
 
-- signed and notarized release builds (Homebrew cask)
+- signed and notarized release builds
 - start a `caffeinate` from the menu
 - notify when `caffeinate` stops
