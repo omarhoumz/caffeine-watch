@@ -195,6 +195,7 @@ struct MenuContent: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .help("Apps and system services other than caffeinate that are also preventing sleep")
                 if showOthers {
                     VStack(alignment: .leading, spacing: 2) { ForEach(s.others) { OtherRow(holder: $0) } }
                 }
