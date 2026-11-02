@@ -21,13 +21,11 @@ Click the icon for details on every process that holds a sleep assertion:
 
 Actions: **Kill** a `caffeinate` process (asks first), **Turn display off now**, **Launch at login**, **Quit**.
 
-## Requirements
-
-macOS 13 Ventura or later, Apple silicon or Intel. Building from source also needs Swift 5.9+ (Xcode or the Command Line Tools: `xcode-select --install`).
-
 ## Install
 
 ### Download
+
+Requires macOS 13 Ventura or later, Apple silicon or Intel.
 
 1. Download `CaffeineWatch.zip` from the [latest release](https://github.com/omarhoumz/caffeine-watch/releases/latest) and unzip it.
 2. Move `CaffeineWatch.app` to `/Applications` or `~/Applications`.
@@ -44,6 +42,8 @@ macOS 13 Ventura or later, Apple silicon or Intel. Building from source also nee
    ```
 
 ### Build from source
+
+Requires macOS 13 Ventura or later and Swift 5.9+ (Xcode or the Command Line Tools: `xcode-select --install`).
 
 ```sh
 git clone https://github.com/omarhoumz/caffeine-watch.git
