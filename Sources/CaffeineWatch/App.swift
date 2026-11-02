@@ -65,10 +65,15 @@ final class Model: ObservableObject {
 
     func displayOff() { _ = Shell.run("/usr/bin/pmset", ["displaysleepnow"]) }
 
-    var launchAtLogin: Bool {
-        get { SMAppService.mainApp.status == .enabled }
-        set { try? newValue ? SMAppService.mainApp.register() : SMAppService.mainApp.unregister() }
+    @Published private(set) var launchAtLogin = SMAppService.mainApp.status == .enabled
+
+    func setLaunchAtLogin(_ on: Bool) {
+        try? on ? SMAppService.mainApp.register() : SMAppService.mainApp.unregister()
+        syncLaunchAtLogin()
     }
+
+    /// The login item can also change in System Settings, so re-read it whenever the popover opens.
+    func syncLaunchAtLogin() { launchAtLogin = SMAppService.mainApp.status == .enabled }
 }
 
 private let shortLabels = ["display": "display", "idle system": "idle", "system sleep": "system", "disk idle": "disk"]
@@ -199,7 +204,7 @@ struct MenuContent: View {
             HStack {
                 Button("Turn display off now", action: model.displayOff)
                 Spacer()
-                Toggle("Launch at login", isOn: Binding(get: { model.launchAtLogin }, set: { model.launchAtLogin = $0 }))
+                Toggle("Launch at login", isOn: Binding(get: { model.launchAtLogin }, set: model.setLaunchAtLogin))
             }
             HStack {
                 Text("Updated \(s.updated.formatted(date: .omitted, time: .standard))")
@@ -270,6 +275,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             popover.performClose(nil)
         } else {
             model.refresh()
+            model.syncLaunchAtLogin()
             NSApp.activate(ignoringOtherApps: true)
             popover.show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)
         }
