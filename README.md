@@ -4,6 +4,8 @@ A macOS menu bar app (and CLI) that shows whether something is keeping your Mac 
 
 Handy when you run `caffeinate` in a tmux session or background job and want to know at a glance that it is still running, how long it has been up, and which session owns it.
 
+<img src="docs/popover.png" alt="CaffeineWatch popover showing caffeinate -dims running in tmux session work" width="468">
+
 ![Menu bar icon states](docs/icons.png)
 
 | Icon | Meaning |
@@ -22,6 +24,17 @@ Click the icon for details on every process that holds a sleep assertion:
 Actions: **Kill** a `caffeinate` process (asks first), **Turn display off now**, **Launch at login**, **Quit**.
 
 ## Install
+
+### Homebrew
+
+Requires macOS 13 Ventura or later, Apple silicon or Intel.
+
+```sh
+brew trust --cask omarhoumz/tap/caffeine-watch
+brew install --cask omarhoumz/tap/caffeine-watch
+```
+
+Homebrew asks you to trust third-party taps once. This installs the app to `/Applications` and the `caffeine-watch` command; `brew upgrade` keeps both current.
 
 ### Download
 
