@@ -23,10 +23,27 @@ Actions: **Kill** a `caffeinate` process (asks first), **Turn display off now**,
 
 ## Requirements
 
-- macOS 13 Ventura or later
-- Swift 5.9+ (Xcode or the Command Line Tools: `xcode-select --install`)
+macOS 13 Ventura or later, Apple silicon or Intel. Building from source also needs Swift 5.9+ (Xcode or the Command Line Tools: `xcode-select --install`).
 
 ## Install
+
+### Download
+
+1. Download `CaffeineWatch.zip` from the [latest release](https://github.com/omarhoumz/caffeine-watch/releases/latest) and unzip it.
+2. Move `CaffeineWatch.app` to `/Applications` or `~/Applications`.
+3. The app is not notarized, so macOS blocks the first launch. Open it once, then allow it in System Settings → Privacy & Security → **Open Anyway** (on macOS 13–14, right-click the app → **Open** also works). Or skip the prompt with:
+
+   ```sh
+   xattr -dr com.apple.quarantine ~/Applications/CaffeineWatch.app
+   ```
+
+4. Optional, for the CLI:
+
+   ```sh
+   ln -sf ~/Applications/CaffeineWatch.app/Contents/MacOS/CaffeineWatch ~/.local/bin/caffeine-watch
+   ```
+
+### Build from source
 
 ```sh
 git clone https://github.com/omarhoumz/caffeine-watch.git
