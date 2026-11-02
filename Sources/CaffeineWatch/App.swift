@@ -101,7 +101,14 @@ struct CaffeinateCard: View {
             HStack(spacing: 4) { ForEach(holder.holds, id: \.self, content: Chip.init) }
             if let start = holder.startedAt, let end = holder.endsAt, end > start {
                 let total = end.timeIntervalSince(start), elapsed = Date().timeIntervalSince(start)
-                ProgressView(value: min(max(elapsed / total, 0), 1)).progressViewStyle(.linear)
+                // A plain bar: the system linear ProgressView draws a moving highlight that reads as busy.
+                GeometryReader { g in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Color.primary.opacity(0.1))
+                        Capsule().fill(Color.accentColor).frame(width: g.size.width * min(max(elapsed / total, 0), 1))
+                    }
+                }
+                .frame(height: 4)
                 Text(verbatim: "\(Duration.format(seconds: Int(elapsed))) of \(Duration.format(seconds: Int(total) + 30))"
                     + " · ends \(end.formatted(date: .omitted, time: .shortened))")
                     .font(.caption2).foregroundStyle(.secondary)
@@ -248,6 +255,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         host.sizingOptions = .preferredContentSize
         popover.contentViewController = host
         popover.behavior = .transient
+        popover.animates = false
     }
 
     @objc private func clicked(_ sender: NSStatusBarButton) {
