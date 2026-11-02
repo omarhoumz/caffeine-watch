@@ -108,11 +108,11 @@ struct CaffeinateCard: View {
             } else {
                 Text(verbatim: "up \(holder.running) · until stopped").font(.caption2).foregroundStyle(.secondary)
             }
-            if hovering { Text(verbatim: detail(holder)).font(.caption2).foregroundStyle(.secondary) }
         }
         .padding(10)
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.05)))
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(hovering ? 0.08 : 0.05)))
         .onHover { hovering = $0 }
+        .help(detail(holder))
     }
 }
 
@@ -130,15 +130,12 @@ struct OtherRow: View {
                     Spacer()
                     HStack(spacing: 4) { ForEach(holder.holds, id: \.self, content: Chip.init) }
                 }
-                if hovering {
-                    Text(holder.command).font(.caption2.monospaced()).lineLimit(2).textSelection(.enabled)
-                    Text(verbatim: detail(holder)).font(.caption2).foregroundStyle(.secondary)
-                }
             }
         }
         .padding(6)
         .background(RoundedRectangle(cornerRadius: 6).fill(hovering ? Color.primary.opacity(0.07) : .clear))
         .onHover { hovering = $0 }
+        .help("\(holder.command)\n\(detail(holder))")
     }
 }
 
@@ -165,7 +162,7 @@ struct MenuContent: View {
                 Spacer()
                 Button("1h") { model.keepAwake(seconds: 3600) }
                 Button("4h") { model.keepAwake(seconds: 4 * 3600) }
-                Button { model.keepAwake(seconds: nil) } label: { Image(systemName: "infinity") }
+                Button("∞") { model.keepAwake(seconds: nil) }
                     .help("Until stopped")
                 Divider().frame(height: 16)
                 Toggle("Keep display on", isOn: $keepDisplayOn)
@@ -193,18 +190,16 @@ struct MenuContent: View {
 
             Divider()
             HStack {
-                Text("Updated \(s.updated.formatted(date: .omitted, time: .standard))")
-                    .font(.caption2).foregroundStyle(.tertiary)
+                Button("Turn display off now", action: model.displayOff)
                 Spacer()
-                Button { model.refresh() } label: { Image(systemName: "arrow.clockwise") }
-                    .buttonStyle(.borderless).help("Refresh")
-                Menu {
-                    Button("Turn display off now", action: model.displayOff)
-                    Toggle("Launch at login", isOn: Binding(get: { model.launchAtLogin }, set: { model.launchAtLogin = $0 }))
-                    Divider()
-                    Button("Quit") { NSApp.terminate(nil) }
-                } label: { Image(systemName: "ellipsis.circle") }
-                .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+                Toggle("Launch at login", isOn: Binding(get: { model.launchAtLogin }, set: { model.launchAtLogin = $0 }))
+            }
+            HStack {
+                Text("Updated \(s.updated.formatted(date: .omitted, time: .standard))")
+                    .font(.caption2.monospacedDigit()).foregroundStyle(.tertiary)
+                Spacer()
+                Button("Refresh") { model.refresh() }
+                Button("Quit") { NSApp.terminate(nil) }
             }
         }
         .padding(14)

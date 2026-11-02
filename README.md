@@ -19,9 +19,9 @@ Click the icon for details on every process that holds a sleep assertion:
 - the full command line, e.g. `caffeinate -dims`, and which tmux session or parent started it
 - what it prevents: display, idle, system or disk sleep
 - for a timed `caffeinate`, a progress bar and the time it ends (the time left also shows next to the menu bar icon)
-- other apps by name and icon; hover a row for its command line, pid, parent and uptime
+- other apps by name and icon; hover a row for a tooltip with its command line, pid, parent and uptime
 
-Actions: **Keep awake** for 1 hour, 4 hours or until stopped, with or without the display, and **Stop** a `caffeinate` process (asks first). The **⋯** menu has **Turn display off now**, **Launch at login** and **Quit**.
+Actions: **Keep awake** for 1 hour, 4 hours or until stopped, with or without the display, **Stop** a `caffeinate` process (asks first), **Turn display off now**, **Launch at login**, **Refresh** and **Quit**.
 
 Right-click the menu bar icon to keep awake, stop `caffeinate` or turn the display off without opening the popover.
 
