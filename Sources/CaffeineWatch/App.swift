@@ -154,6 +154,7 @@ struct OtherRow: View {
 struct MenuContent: View {
     @ObservedObject var model: Model
     @State private var showOthers = false
+    @State private var showOthersInfo = false
     @AppStorage("keepDisplayOn") private var keepDisplayOn = true
 
     var body: some View {
@@ -182,20 +183,31 @@ struct MenuContent: View {
 
             if !s.others.isEmpty {
                 Divider()
-                Button {
-                    showOthers.toggle()
-                } label: {
-                    HStack {
-                        Image(systemName: "chevron.right")
-                            .font(.caption.weight(.semibold))
-                            .rotationEffect(.degrees(showOthers ? 90 : 0))
-                        Text("Other apps (\(s.others.count))")
-                        Spacer()
+                HStack(spacing: 6) {
+                    Button {
+                        showOthers.toggle()
+                    } label: {
+                        HStack {
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.semibold))
+                                .rotationEffect(.degrees(showOthers ? 90 : 0))
+                            Text("Other apps (\(s.others.count))")
+                        }
+                        .contentShape(Rectangle())
                     }
-                    .contentShape(Rectangle())
+                    .buttonStyle(.plain)
+                    Button { showOthersInfo.toggle() } label: { Image(systemName: "info.circle") }
+                        .buttonStyle(.borderless)
+                        .foregroundStyle(.secondary)
+                        .popover(isPresented: $showOthersInfo, arrowEdge: .bottom) {
+                            Text("Apps and system services other than caffeinate that are also preventing sleep.")
+                                .font(.callout)
+                                .frame(width: 240, alignment: .leading)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .padding(10)
+                        }
+                    Color.clear.contentShape(Rectangle()).onTapGesture { showOthers.toggle() }
                 }
-                .buttonStyle(.plain)
-                .help("Apps and system services other than caffeinate that are also preventing sleep")
                 if showOthers {
                     VStack(alignment: .leading, spacing: 2) { ForEach(s.others) { OtherRow(holder: $0) } }
                 }
